@@ -1,4 +1,4 @@
-import { Address, http, parseGwei, PrivateKeyAccount, createWalletClient, Hex} from "viem"
+import { Address, http, parseGwei, PrivateKeyAccount, createWalletClient, Hex, createPublicClient, PublicClient} from "viem"
 import { sepolia } from "viem/chains"
 import { UserOperation } from "../types/userop.types"
 
@@ -6,9 +6,9 @@ import { UserOperation } from "../types/userop.types"
  * Represents an entrypoint for interacting with an ERC4337 contract.
  */
 export class ERC4337EntryPoint {
-	private contractAddress: Address
-	private contractABI: object[]
-	// private publicClient: PublicClient
+	public contractAddress: Address
+	public contractABI: object[]
+	private publicClient: PublicClient
   
 	/**
 	 * Creates an instance of ERC4337EntryPoint.
@@ -21,10 +21,10 @@ export class ERC4337EntryPoint {
 	) {
 		this.contractAddress = contractAddress
 		this.contractABI = contractABI
-		// this.publicClient = createPublicClient({
-		// 	chain: sepolia,
-		// 	transport: http()
-		// })
+		this.publicClient = createPublicClient({
+			chain: sepolia,
+			transport: http()
+		})
 	}
   
 	/**
@@ -34,24 +34,28 @@ export class ERC4337EntryPoint {
 	 * @param eoa The EOA (Externally Owned Account) used to sign the transaction.
 	 * @returns A promise that resolves to the transaction hash.
 	 */
-	async submitUserOperation(
+	async handleOps(
 		userOp: UserOperation[],
 		beneficiary: Address,
 		eoa: PrivateKeyAccount,
 		nonce: number,
+		gasMultiplier: number = 1
 	): Promise<Hex> {
 		const args = {
 			address: this.contractAddress as Address,
 			abi: this.contractABI,
 			functionName: "handleOps",
 			args: [userOp, beneficiary],
-			gas: 1000000n, // TODO: remove hardcoded value
+			gas: 0n,
 			chain: sepolia, // TODO: remove hardcoded value
 			nonce: nonce,
 			maxFeePerGas: parseGwei("20"),
 			maxPriorityFeePerGas: parseGwei("2"),
 			account: eoa,
 		}
+		const gas = await this.publicClient.estimateContractGas(args)
+		args.gas = gas * BigInt(gasMultiplier)
+
 		const walletClient = createWalletClient({account: eoa, transport: http(), chain: sepolia})
 		
 		try {
