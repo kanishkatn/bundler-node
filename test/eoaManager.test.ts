@@ -3,11 +3,11 @@ import EOAManager from "../src/eoaManager"
 describe("EOAManager Tests", () => {
 	let eoaManager: EOAManager
 	const eoas = {
-		1: {
+		0: {
 			privKey: "0x636ad8c3cccf3c3168a7a4a4229ce0f632a1214fe88bfba5934063f29866174c",
 			address: "0xF1100f2f877Fc977eE2AC2f99DCB1C2b35a84bf8",
 		},
-		2: {
+		1: {
 			privKey: "0x385c3c3db514cccd597d0b06f0bc51a5afab6c41599a091eddd3a2a4a09787ba",
 			address: "0xfaa3Beedb24884146E199084355b4E9fA33Da086",
 		},
@@ -15,7 +15,7 @@ describe("EOAManager Tests", () => {
 	const timeoutMs = 1000
 
 	beforeEach(() => {
-		process.env.EOAS = `${eoas[1].privKey},${eoas[2].privKey}`
+		process.env.EOAS = `${eoas[0].privKey},${eoas[2].privKey}`
 		eoaManager = new EOAManager()
 	})
 
@@ -32,7 +32,7 @@ describe("EOAManager Tests", () => {
 	})
 
 	test("should throw error if less than 2 EOAs are set", async () => {
-		process.env.EOAS = eoas[1].privKey
+		process.env.EOAS = eoas[0].privKey
 		expect(() => {
 			new EOAManager()
 		}).toThrow("Need at least 2 EOAs")
@@ -48,7 +48,7 @@ describe("EOAManager Tests", () => {
 	test("should get available EOA", async () => {
 		const availableEOA = await eoaManager.acquireEOA(timeoutMs)
 		expect(availableEOA).toBeDefined()
-		expect(availableEOA.address).toBe(eoas[1].address)
+		expect(availableEOA.address).toBe(eoas[0].address)
 	})
 
 	test("should signal EOA release", async () => {
@@ -59,7 +59,7 @@ describe("EOAManager Tests", () => {
     
 		const secondEOA = await eoaManager.acquireEOA(timeoutMs)
 		expect(secondEOA).toBeDefined()
-		expect(secondEOA.address).toBe(eoas[1].address)
+		expect(secondEOA.address).toBe(eoas[0].address)
 	})
 
 	test("should timeout if no EOAs are available", async () => {
@@ -74,7 +74,7 @@ describe("EOAManager Tests", () => {
 
 	test("should avoid deadlocks when signaling EOA release", async () => {
 		const firstEOA = await eoaManager.acquireEOA(timeoutMs)
-		await eoaManager.acquireEOA(timeoutMs) // secondEOA
+		const secondEOA = await eoaManager.acquireEOA(timeoutMs)
 
 		const thirdEOA = eoaManager.acquireEOA(timeoutMs)
 
@@ -87,5 +87,6 @@ describe("EOAManager Tests", () => {
 		// After releasing the EOA, ensure the third EOA can be acquired without deadlock
 		await expect(thirdEOA).resolves.toBeDefined()
 		jest.useRealTimers()
+		await eoaManager.releaseEOA(secondEOA)
 	})
 })

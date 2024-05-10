@@ -1,4 +1,4 @@
-import { Hex } from "viem"
+import { Address, Hex } from "viem"
 import { privateKeyToAccount, PrivateKeyAccount } from "viem/accounts"
 import { EventEmitter } from "events"
 import { Mutex } from "async-mutex"
@@ -7,7 +7,7 @@ import { Mutex } from "async-mutex"
  * EOAStatus is a map of EOA addresses to their availability status.
  */
 interface EOAStatus {
-	[address: string]: boolean
+	[address: Address]: boolean
 }
 
 /**
