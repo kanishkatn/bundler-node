@@ -15,7 +15,7 @@ describe("EOAManager Tests", () => {
 	const timeoutMs = 1000
 
 	beforeEach(() => {
-		process.env.EOAS = `${eoas[0].privKey},${eoas[2].privKey}`
+		process.env.EOAS = `${eoas[0].privKey},${eoas[1].privKey}`
 		eoaManager = new EOAManager()
 	})
 
@@ -60,6 +60,14 @@ describe("EOAManager Tests", () => {
 		const secondEOA = await eoaManager.acquireEOA(timeoutMs)
 		expect(secondEOA).toBeDefined()
 		expect(secondEOA.address).toBe(eoas[0].address)
+	})
+
+	test("should update eoa status correctly", async () => {
+		const availableEOA = await eoaManager.acquireEOA(timeoutMs)
+		expect(availableEOA).toBeDefined()
+		expect(await eoaManager.getEOAStatus(availableEOA.address)).toBe(true)
+		await eoaManager.releaseEOA(availableEOA)
+		expect(await eoaManager.getEOAStatus(availableEOA.address)).toBe(false)
 	})
 
 	test("should timeout if no EOAs are available", async () => {

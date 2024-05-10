@@ -103,6 +103,15 @@ class EOAManager {
 			this.eoaEmitter.emit("eoa-available", eoa)
 		})
 	}
+
+	/**
+	 * Gets the status of an EOA.
+	 * @param eoa The EOA address.
+	 * @returns The status of the EOA.
+	 */
+	public async getEOAStatus( eoa: Address): Promise<boolean> {
+		return this.eoaStatus[eoa]
+	}
 }
 
 export default EOAManager
