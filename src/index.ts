@@ -14,10 +14,17 @@ const app = express()
 app.use(bodyParser.json())
 
 // Initialise the modules
-const entrypoint = new ERC4337EntryPoint(config.entrypointContract as Address, IENTRY_POINT_ABI)
-const rpcHelper = new RPCHelper()
+const entrypoint = new ERC4337EntryPoint(config.entrypointContract as Address, IENTRY_POINT_ABI, config.chain)
+const rpcHelper = new RPCHelper(config.chain)
 const eoaManager = new EOAManager(config.eoas)
-const userOpManager = new UserOpManager(eoaManager, config.eoaWaitTimeMS, config.txWaitTimeMS, entrypoint, rpcHelper, config.maxAttempts)
+const userOpManager = new UserOpManager(eoaManager, 
+	config.eoaWaitTimeMS, 
+	config.txWaitTimeMS, 
+	entrypoint, 
+	rpcHelper, 
+	config.maxAttempts, 
+	config.chain,
+)
 
 app.locals.userOpManager = userOpManager
 app.locals.beneficiary = config.beneficiary

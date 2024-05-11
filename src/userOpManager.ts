@@ -1,11 +1,11 @@
 import EOAManager from "./eoaManager"
 import { PrivateKeyAccount, http, createPublicClient, Hex, PublicClient, Address } from "viem"
-import { sepolia } from "viem/chains"
 import { UserOperation } from "./types/userop.types"
 import { ERC4337EntryPoint } from "./entrypoint/entrypoint"
 import {TransactionReceipt} from "viem/_types"
 import { RPCHelper } from "./rpcHelper"
 import { TimeoutError, TransactionFailedError } from "./types/errors.types"
+import { getChain } from "./types/chain.types"
 
 /**
  * UserOpManager manages the sending of user operations.
@@ -31,14 +31,21 @@ class UserOpManager {
 	 * @param maxAttempts The maximum number of attempts to send the transaction.
 	 * @returns A UserOpManager instance.
 	 */
-	constructor(eoaManager: EOAManager, eoaWaitTime: number = 5000, txWaitTime:number = 120000, entryPoint: ERC4337EntryPoint, rpcHelper: RPCHelper, maxAttempts: number = 3) {
+	constructor(eoaManager: EOAManager,
+		eoaWaitTime: number = 5000, 
+		txWaitTime:number = 120000, 
+		entryPoint: ERC4337EntryPoint, 
+		rpcHelper: RPCHelper, 
+		maxAttempts: number = 3,
+		chain: string,
+	) {
 		this.eoaManager = eoaManager
 		this.eoaWaitTime = eoaWaitTime
 		this.txWaitTime = txWaitTime
 		this.entryPoint = entryPoint
 		this.rpcHelper = rpcHelper
 		this.publicClient = createPublicClient({
-			chain: sepolia,
+			chain: getChain(chain),
 			transport: http()
 		})
 		this.maxAttempts = maxAttempts
@@ -91,7 +98,12 @@ class UserOpManager {
 	 * @param attempt The attempt number.
 	 * @returns A promise that resolves when the monitoring is complete.
 	 */
-	private async monitorAndReleaseEOA(userOp: UserOperation[], beneficiary: Address, hash: Hex, eoa: PrivateKeyAccount, nonce: number, attempt: number): Promise<void> {
+	private async monitorAndReleaseEOA(userOp: UserOperation[], 
+		beneficiary: Address, 
+		hash: Hex, eoa: PrivateKeyAccount, 
+		nonce: number, 
+		attempt: number,
+	): Promise<void> {
 		try {
 			const receipt = await this.monitorTransaction(hash)
 			if (receipt.status == "success") {
@@ -127,7 +139,12 @@ class UserOpManager {
 	 * @returns A promise that resolves to the transaction hash.
 	 * @throws Error if the transaction fails after 3 attempts.
 	 */
-	public async submitUserOps(userOps: UserOperation[], beneficiary: Address, eoa: PrivateKeyAccount, nonce: number, attempt: number): Promise<Hex> {
+	public async submitUserOps(userOps: UserOperation[], 
+		beneficiary: Address, 
+		eoa: PrivateKeyAccount, 
+		nonce: number, 
+		attempt: number,
+	): Promise<Hex> {
 		if (attempt > this.maxAttempts) {
 			await this.eoaManager.releaseEOA(eoa)
 			throw new TransactionFailedError(`Transaction failed after ${this.maxAttempts} attempts`)

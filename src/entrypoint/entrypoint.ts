@@ -1,7 +1,7 @@
-import { Address, http, parseGwei, PrivateKeyAccount, createWalletClient, Hex, createPublicClient, PublicClient} from "viem"
-import { sepolia } from "viem/chains"
+import { Address, http, parseGwei, PrivateKeyAccount, createWalletClient, Hex, createPublicClient, PublicClient, Chain} from "viem"
 import { UserOperation } from "../types/userop.types"
 import { ContractError } from "../types/errors.types"
+import { getChain } from "../types/chain.types"
 
 /**
  * Represents an entrypoint for interacting with an ERC4337 contract.
@@ -10,6 +10,7 @@ export class ERC4337EntryPoint {
 	public contractAddress: Address
 	public contractABI: object[]
 	private publicClient: PublicClient
+	private chain: Chain
 
 	private baseMaxFeePerGas = parseGwei("20")
 	private baseMaxPriorityFeePerGas = parseGwei("2")
@@ -22,11 +23,13 @@ export class ERC4337EntryPoint {
 	constructor(
 		contractAddress: Address,
 		contractABI: object[],
+		chain: string,
 	) {
 		this.contractAddress = contractAddress
 		this.contractABI = contractABI
+		this.chain = getChain(chain)
 		this.publicClient = createPublicClient({
-			chain: sepolia,
+			chain: this.chain,
 			transport: http()
 		})
 	}
@@ -72,7 +75,7 @@ export class ERC4337EntryPoint {
 			functionName: "handleOps",
 			args: [userOp, beneficiary],
 			gas: 0n,
-			chain: sepolia, // TODO: remove hardcoded value
+			chain: this.chain, 
 			nonce: nonce,
 			maxFeePerGas: this.baseMaxFeePerGas,
 			maxPriorityFeePerGas: this.baseMaxPriorityFeePerGas,
@@ -88,7 +91,7 @@ export class ERC4337EntryPoint {
 			args.maxFeePerGas = maxFeePerGas
 			args.maxPriorityFeePerGas = maxPriorityFeePerGas
 	
-			const walletClient = createWalletClient({account: eoa, transport: http(), chain: sepolia})
+			const walletClient = createWalletClient({account: eoa, transport: http(), chain: this.chain})
 			// TODO: check if it is nice to have it here. The requirement states that it isn't necessary to simulate the contract.
 			// but it will increase the chances of not failing the transaction significantly
 			// const {request} = await this.publicClient.simulateContract(args)

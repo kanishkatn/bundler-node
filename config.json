@@ -3,6 +3,7 @@
         "name": "Bundler node",
         "port": 3000
     },
+    "chain": "sepolia",
     "entrypointContract":"0x5ff137d4b0fdcd49dca30c7cf57e578a026d2789",
     "beneficiary": "0x7a939a944974e759a8365682682Be1BD94c8a6d9",
     "eoas": "0x,0x",

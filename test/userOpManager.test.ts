@@ -28,13 +28,15 @@ describe("UserOpManager", () => {
 	const txTimeoutMs = 100000
 	const entrypointContract = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
 	const beneficiary = "0x7a939a944974e759a8365682682Be1BD94c8a6d9"
+	const chain = "sepolia"
+	const maxAttempts = 3
 
 	beforeEach(() => {
 		const eoaString = `${eoas[0].privKey},${eoas[1].privKey}`
 		eoaManager = new EOAManager(eoaString)
-		const entryPoint = new ERC4337EntryPoint(entrypointContract, IENTRY_POINT_ABI)
-		const rpcHelper = new RPCHelper()
-		userOpManager = new UserOpManager(eoaManager, eoaTimeoutMs,txTimeoutMs, entryPoint, rpcHelper)
+		const entryPoint = new ERC4337EntryPoint(entrypointContract, IENTRY_POINT_ABI, chain)
+		const rpcHelper = new RPCHelper(chain)
+		userOpManager = new UserOpManager(eoaManager, eoaTimeoutMs,txTimeoutMs, entryPoint, rpcHelper, maxAttempts, chain)
 	})
 
 	it.skip("should send a user operation and return a transaction hash", async () => {

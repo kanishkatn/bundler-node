@@ -1,13 +1,13 @@
 import { createPublicClient, PublicClient, http, Hex, TransactionReceipt, Address } from "viem"
-import { sepolia } from "viem/chains"
 import { NetworkError } from "./types/errors.types"
+import { getChain } from "./types/chain.types"
 
 export class RPCHelper {
 	private PublicClient: PublicClient
 
-	constructor() {
+	constructor(chain: string) {
 		this.PublicClient = createPublicClient({
-			chain: sepolia,
+			chain: getChain(chain),
 			transport: http()
 		})
 	}
