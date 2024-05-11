@@ -15,8 +15,8 @@ describe("EOAManager Tests", () => {
 	const timeoutMs = 1000
 
 	beforeEach(() => {
-		process.env.EOAS = `${eoas[0].privKey},${eoas[1].privKey}`
-		eoaManager = new EOAManager()
+		const eoaString = `${eoas[0].privKey},${eoas[1].privKey}`
+		eoaManager = new EOAManager(eoaString)
 	})
 
 	test("should initialize EOAs correctly", () => {
@@ -25,23 +25,22 @@ describe("EOAManager Tests", () => {
 	})
 
 	test("should throw error if EOAs cannot be initialized", async () => {
-		process.env.EOAS = ""
 		expect(() => {
-			new EOAManager()
-		}).toThrow("EOAs environment variable is not set")
+			new EOAManager("")
+		}).toThrow("Need at least 2 EOAs")
 	})
 
 	test("should throw error if less than 2 EOAs are set", async () => {
-		process.env.EOAS = eoas[0].privKey
+		const eoaString = eoas[0].privKey
 		expect(() => {
-			new EOAManager()
+			new EOAManager(eoaString)
 		}).toThrow("Need at least 2 EOAs")
 	})
 
 	test("should throw error if invalid EOA is set", async () => {
-		process.env.EOAS = "invalidEOA1,invalidEOA2"
+		const eoaString = "invalidEOA1,invalidEOA2"
 		expect(() => {
-			new EOAManager()
+			new EOAManager(eoaString)
 		}).toThrow("private key must be 32 bytes, hex or bigint, not string")
 	})
 
@@ -77,7 +76,7 @@ describe("EOAManager Tests", () => {
 		expect(availableEOA2).toBeDefined()
 	
 		const secondEOAPromise = eoaManager.acquireEOA(timeoutMs)
-		await expect(secondEOAPromise).rejects.toThrow("Timeout: No available EOAs")
+		await expect(secondEOAPromise).rejects.toThrow("No available EOAs")
 	})
 
 	test("should avoid deadlocks when signaling EOA release", async () => {

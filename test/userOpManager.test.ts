@@ -5,6 +5,7 @@ import { ERC4337EntryPoint } from "../src/entrypoint/entrypoint"
 import { IENTRY_POINT_ABI } from "../src/entrypoint/entrypoint.abi"
 import { Address, hexToBigInt } from "viem"
 import { RPCHelper } from "../src/rpcHelper"
+import { exit } from "process"
 
 describe("UserOpManager", () => {
 	jest.retryTimes(0)
@@ -25,11 +26,13 @@ describe("UserOpManager", () => {
 
 	// To simulate a scenario of stuck txn, set txTimeoutMs to a low value
 	const txTimeoutMs = 100000
+	const entrypointContract = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
+	const beneficiary = "0x7a939a944974e759a8365682682Be1BD94c8a6d9"
 
 	beforeEach(() => {
-		process.env.EOAS = `${eoas[0].privKey},${eoas[1].privKey}`
-		eoaManager = new EOAManager()
-		const entryPoint = new ERC4337EntryPoint("0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789", IENTRY_POINT_ABI)
+		const eoaString = `${eoas[0].privKey},${eoas[1].privKey}`
+		eoaManager = new EOAManager(eoaString)
+		const entryPoint = new ERC4337EntryPoint(entrypointContract, IENTRY_POINT_ABI)
 		const rpcHelper = new RPCHelper()
 		userOpManager = new UserOpManager(eoaManager, eoaTimeoutMs,txTimeoutMs, entryPoint, rpcHelper)
 	})
@@ -49,9 +52,11 @@ describe("UserOpManager", () => {
 			preVerificationGas: hexToBigInt("0xeab6"),
 			paymasterAndData: "0x"
 		}
+		console.log("userOp", userOp)
+		exit(0)
 
 		// when
-		const transactionHash = await userOpManager.handleUserOp([userOp], "0x7a939a944974e759a8365682682Be1BD94c8a6d9")
+		const transactionHash = await userOpManager.handleUserOp([userOp], beneficiary)
 
 		// then
 		expect(typeof transactionHash).toBe("string")

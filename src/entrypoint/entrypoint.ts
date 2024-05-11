@@ -1,6 +1,7 @@
 import { Address, http, parseGwei, PrivateKeyAccount, createWalletClient, Hex, createPublicClient, PublicClient} from "viem"
 import { sepolia } from "viem/chains"
 import { UserOperation } from "../types/userop.types"
+import { ContractError } from "../types/errors.types"
 
 /**
  * Represents an entrypoint for interacting with an ERC4337 contract.
@@ -41,7 +42,10 @@ export class ERC4337EntryPoint {
 		// for example, ethereum expects a minimum multiplier of 1.10 (10% increase) for the gas limit
 		// Note: it does not work if we just increase the gasLimit on sepolia. 
 		// It is necessary to increase the maxFeePerGas and the maxPriorityFeePerGas as well.
-		const gasLimit = (gas * BigInt(gasMultiplier))/2n // TODO: remove test changes
+		if (gasMultiplier < 1) {
+			throw new Error("Gas multiplier must be greater than or equal to 1")
+		}
+		const gasLimit = gas * BigInt(gasMultiplier)
 		const maxFeePerGas = this.baseMaxFeePerGas * BigInt(gasMultiplier)
 		const maxPriorityFeePerGas = this.baseMaxPriorityFeePerGas * BigInt(gasMultiplier)
 
@@ -91,9 +95,15 @@ export class ERC4337EntryPoint {
 			// console.log("simulated contract", request)
 			const txHash = await walletClient.writeContract(args)
 			return txHash
-		} catch (error) {
-			console.error(`Failed to submit user operation: ${error}`)
-			throw Error("Failed to submit user operation")
+		} catch (error: unknown) {
+			// viem.sh encapsulates the stack trace in the error message
+			// here we print the complete error message and throw only the first line
+			if (error instanceof Error) {
+				console.error(`Failed to submit user operation: ${(error as Error).message}`)
+			}
+			// cut the error message to the first line
+			const errorMessage = (error as Error).message.split("\n")[0]
+			throw new ContractError(`Failed to submit user operation: ${errorMessage}`)
 		}
 	}
 }

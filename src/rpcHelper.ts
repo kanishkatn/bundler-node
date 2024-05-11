@@ -17,8 +17,11 @@ export class RPCHelper {
 			const count = await this.PublicClient.getTransactionCount({address: address})
 			return count
 		} catch (error) {
+			// viem.sh encapsulates the stack trace in the error message
+			// here we print the complete error message and throw only the first line
 			console.error(`Failed to get transaction count for address ${address}: ${error}`)
-			throw new NetworkError("Failed to get transaction count")
+			const errorMessage = (error as Error).message.split("\n")[0]
+			throw new NetworkError(`Failed to get transaction count: ${errorMessage}`)
 		}
 	}
 
@@ -27,8 +30,11 @@ export class RPCHelper {
 			const receipt = await this.PublicClient.getTransactionReceipt({hash: hash})
 			return receipt
 		} catch (error) {
+			// viem.sh encapsulates the stack trace in the error message
+			// here we print the complete error message and throw only the first line
 			console.error(`Failed to get transaction receipt for hash ${hash}: ${error}`)
-			throw new NetworkError("Failed to get transaction receipt")
+			const errorMessage = (error as Error).message.split("\n")[0]
+			throw new NetworkError(`Failed to get transaction receipt: ${errorMessage}`)
 		}
 	}
 }

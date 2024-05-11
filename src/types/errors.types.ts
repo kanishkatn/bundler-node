@@ -37,3 +37,13 @@ export class ContractError extends Error {
 		this.name = "ContractError"
 	}
 }
+
+/**
+ * InvalidUserOperationError is thrown when a user operation is invalid.
+ */
+export class InvalidUserOperationError extends Error {
+	constructor(message: string) {
+		super(message)
+		this.name = "InvalidUserOperationError"
+	}
+}

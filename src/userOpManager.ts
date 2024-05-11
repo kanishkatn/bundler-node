@@ -5,7 +5,7 @@ import { UserOperation } from "./types/userop.types"
 import { ERC4337EntryPoint } from "./entrypoint/entrypoint"
 import {TransactionReceipt} from "viem/_types"
 import { RPCHelper } from "./rpcHelper"
-import { ContractError, NetworkError, TimeoutError, TransactionFailedError } from "./types/errors.types"
+import { TimeoutError, TransactionFailedError } from "./types/errors.types"
 
 /**
  * UserOpManager manages the sending of user operations.
@@ -99,14 +99,15 @@ class UserOpManager {
 				console.debug(`Releasing EOA ${eoa.address} ...`)
 				await this.eoaManager.releaseEOA(eoa)
 			} else {
-				console.log(`Transaction ${hash} failed`)
-				// if the transaction fails, resubmit the transaction by incrementing the attempt immediately
-				await this.submitUserOps(userOp, beneficiary, eoa, nonce, attempt + 1)
+				console.log(`Transaction ${hash} failed. Resubmitting ...`)
+				// if the transaction fails, resubmit the transaction by incrementing the nonce and attempt after a delay
+				await this.delay(20000)
+				await this.submitUserOps(userOp, beneficiary, eoa, nonce + 1, attempt + 1)
 			}
 		} catch (error: unknown) {
 			if (error instanceof TimeoutError) {
 				console.error(`Transaction ${hash} timed out. Resumbitting ...`)
-				// if the transaction times out, resubmit the transaction by incrementing the attempt
+				// if the transaction times out, resubmit the transaction by incrementing the attempt 
 				// it will use the same nonce and increased gas thereby dropping the previous transaction
 				await this.submitUserOps(userOp, beneficiary, eoa, nonce, attempt + 1)
 			} else {
@@ -144,13 +145,7 @@ class UserOpManager {
 			return hash
 		} catch (error) {
 			await this.eoaManager.releaseEOA(eoa)
-			if (error instanceof ContractError) {
-				console.error(`Failed to submit user operation: ${error}`)
-				throw Error("Failed to submit user operation")
-			} else {
-				console.error(`An unknown error occurred while submitting user operation: ${error}`)
-				throw Error("An unknown error occurred while submitting user operation")
-			}
+			throw error
 		}
 	}
 
@@ -166,14 +161,9 @@ class UserOpManager {
 			const nonce = await this.rpcHelper.getTransactionCount(eoa.address)
 			return await this.submitUserOps(userOps, beneficiary, eoa, nonce, 1)
 		} catch (error) {
-			if (error instanceof NetworkError) {
-				console.error(`A network error occurred while handling user operation": ${error}`)
-				throw Error("A network error occurred while handling user operation")
-			} else if (error instanceof TimeoutError) {
-				console.error("Timeout: No available EOAs")
-				throw Error("Timeout: No available EOAs")
+			if (error instanceof TimeoutError) {
+				throw Error(`Timeout Error: ${error.message}`)
 			} else {
-				console.error(`error occurred while handling user operation: ${error}`)
 				throw error
 			}
 		}

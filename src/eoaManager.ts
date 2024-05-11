@@ -20,23 +20,16 @@ class EOAManager {
 	private eoaEmitter = new EventEmitter() // Emitter for EOA availability
 	private eoaMutex = new Mutex() // Mutex for EOA status
 
-	constructor() {
-		this.initializeEOAs()
+	constructor(eoas: string) {
+		this.initializeEOAs(eoas)
 	}
 
 	/**
 	 * Initializes the EOAs from the environment variable.
-	 * @throws Error if EOAs environment variable is not set or less than 2 EOAs are set.
-	 * @throws Error if invalid EOA is set.
+	 * @param eoas The comma-separated list of EOAs.
 	 */
-	private initializeEOAs(): void {
-		const eoasEnv = process.env.EOAS
-
-		if (!eoasEnv) {
-			throw new Error("EOAs environment variable is not set")
-		}
-
-		const privateKeys = eoasEnv.split(",")
+	private initializeEOAs(eoas: string): void {
+		const privateKeys = eoas.split(",")
 		if (privateKeys.length < 2) {
 			throw new Error("Need at least 2 EOAs")
 		}
@@ -86,7 +79,7 @@ class EOAManager {
 
 			setTimeout(() => {
 				this.eoaEmitter.off("eoa-available", onEOAAvailable)
-				reject(new TimeoutError("Timeout: No available EOAs"))
+				reject(new TimeoutError("No available EOAs"))
 			}, timeoutMs - (Date.now() - startTime))
 		})
 
@@ -96,6 +89,7 @@ class EOAManager {
 	/**
 	 * Releases an EOA.
 	 * @param eoa The EOA to release.
+	 * @returns A promise that resolves when the EOA is released.
 	 */
 	public async releaseEOA(eoa: PrivateKeyAccount): Promise<void> {
 		await this.eoaMutex.acquire().then((release) => {
