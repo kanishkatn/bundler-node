@@ -1,5 +1,6 @@
 import { createPublicClient, PublicClient, http, Hex, TransactionReceipt, Address } from "viem"
 import { sepolia } from "viem/chains"
+import { NetworkError } from "./types/errors.types"
 
 export class RPCHelper {
 	private PublicClient: PublicClient
@@ -17,7 +18,7 @@ export class RPCHelper {
 			return count
 		} catch (error) {
 			console.error(`Failed to get transaction count for address ${address}: ${error}`)
-			throw Error("Failed to get transaction count")
+			throw new NetworkError("Failed to get transaction count")
 		}
 	}
 
@@ -27,7 +28,7 @@ export class RPCHelper {
 			return receipt
 		} catch (error) {
 			console.error(`Failed to get transaction receipt for hash ${hash}: ${error}`)
-			throw Error("Failed to get transaction receipt")
+			throw new NetworkError("Failed to get transaction receipt")
 		}
 	}
 }

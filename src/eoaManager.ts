@@ -2,6 +2,7 @@ import { Address, Hex } from "viem"
 import { privateKeyToAccount, PrivateKeyAccount } from "viem/accounts"
 import { EventEmitter } from "events"
 import { Mutex } from "async-mutex"
+import { TimeoutError } from "./types/errors.types"
 
 /**
  * EOAStatus is a map of EOA addresses to their availability status.
@@ -85,7 +86,7 @@ class EOAManager {
 
 			setTimeout(() => {
 				this.eoaEmitter.off("eoa-available", onEOAAvailable)
-				reject(new Error("Timeout: No available EOAs"))
+				reject(new TimeoutError("Timeout: No available EOAs"))
 			}, timeoutMs - (Date.now() - startTime))
 		})
 

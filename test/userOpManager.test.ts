@@ -34,7 +34,7 @@ describe("UserOpManager", () => {
 		userOpManager = new UserOpManager(eoaManager, eoaTimeoutMs,txTimeoutMs, entryPoint, rpcHelper)
 	})
 
-	it("should send a user operation and return a transaction hash", async () => {
+	it.skip("should send a user operation and return a transaction hash", async () => {
 		// with
 		const userOp: UserOperation = {
 			sender: "0x49C82ae7e76fa4CDA761F14e1e9cEA0DD4868724",

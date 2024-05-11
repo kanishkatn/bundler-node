@@ -39,7 +39,7 @@ export class ERC4337EntryPoint {
 	private async getOptimalGas(gas: bigint, gasMultiplier: number): Promise<[bigint, bigint, bigint]> {
 		// TODO: the multiplier logic here is temporary, mostly for the initial testing flow and should be replaced with a more sophisticated one
 		// for example, ethereum expects a minimum multiplier of 1.10 (10% increase) for the gas limit
-		// Note: it does not work if we just increase the gasLimit on ropsten. 
+		// Note: it does not work if we just increase the gasLimit on sepolia. 
 		// It is necessary to increase the maxFeePerGas and the maxPriorityFeePerGas as well.
 		const gasLimit = (gas * BigInt(gasMultiplier))/2n // TODO: remove test changes
 		const maxFeePerGas = this.baseMaxFeePerGas * BigInt(gasMultiplier)
@@ -74,18 +74,18 @@ export class ERC4337EntryPoint {
 			maxPriorityFeePerGas: this.baseMaxPriorityFeePerGas,
 			account: eoa,
 		}
-		const baseGas = await this.publicClient.estimateContractGas(args)
-		
-		// get the optimal gas for the transaction based on the gas multiplier
-		const [gasLimit, maxFeePerGas, maxPriorityFeePerGas] = await this.getOptimalGas(baseGas, gasMultiplier)
-		args.gas = gasLimit
-		args.maxFeePerGas = maxFeePerGas
-		args.maxPriorityFeePerGas = maxPriorityFeePerGas
-
-		const walletClient = createWalletClient({account: eoa, transport: http(), chain: sepolia})
 		
 		try {
-			// TODO: check if it is nice to have it here. The requirement states that it isn't necessary to simulate the contract
+			const baseGas = await this.publicClient.estimateContractGas(args)
+			
+			// get the optimal gas for the transaction based on the gas multiplier
+			const [gasLimit, maxFeePerGas, maxPriorityFeePerGas] = await this.getOptimalGas(baseGas, gasMultiplier)
+			args.gas = gasLimit
+			args.maxFeePerGas = maxFeePerGas
+			args.maxPriorityFeePerGas = maxPriorityFeePerGas
+	
+			const walletClient = createWalletClient({account: eoa, transport: http(), chain: sepolia})
+			// TODO: check if it is nice to have it here. The requirement states that it isn't necessary to simulate the contract.
 			// but it will increase the chances of not failing the transaction significantly
 			// const {request} = await this.publicClient.simulateContract(args)
 			// console.log("simulated contract", request)

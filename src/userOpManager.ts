@@ -5,6 +5,7 @@ import { UserOperation } from "./types/userop.types"
 import { ERC4337EntryPoint } from "./entrypoint/entrypoint"
 import {TransactionReceipt} from "viem/_types"
 import { RPCHelper } from "./rpcHelper"
+import { ContractError, NetworkError, TimeoutError, TransactionFailedError } from "./types/errors.types"
 
 /**
  * UserOpManager manages the sending of user operations.
@@ -62,8 +63,6 @@ class UserOpManager {
 		const startTime = Date.now()
 
 		while(Date.now() - startTime < this.txWaitTime) {  // Continues until a receipt is found or timeout is reached
-			console.debug("wait time: ", this.txWaitTime)
-			console.debug("time taken: ", Date.now() - startTime)
 			try {
 				const receipt: TransactionReceipt | null = await this.publicClient.getTransactionReceipt({ hash: hash as Hex })
 				console.log("Transaction receipt:", receipt)
@@ -80,7 +79,7 @@ class UserOpManager {
 			}
 		}
 
-		throw new Error("Transaction timed out")
+		throw new TimeoutError("Transaction timed out")
 	}
 
 	/**
@@ -90,7 +89,7 @@ class UserOpManager {
 	 * @param eoa The EOA.
 	 * @param nonce The nonce of the EOA.
 	 * @param attempt The attempt number.
-	 * @returns A promise that resolves when the EOA is released.
+	 * @returns A promise that resolves when the monitoring is complete.
 	 */
 	private async monitorAndReleaseEOA(userOp: UserOperation[], beneficiary: Address, hash: Hex, eoa: PrivateKeyAccount, nonce: number, attempt: number): Promise<void> {
 		try {
@@ -105,13 +104,13 @@ class UserOpManager {
 				await this.submitUserOps(userOp, beneficiary, eoa, nonce, attempt + 1)
 			}
 		} catch (error: unknown) {
-			if (error instanceof Error && error.message == "Transaction timed out") {
-				console.log("Transaction timed out. Resubmitting ...")
+			if (error instanceof TimeoutError) {
+				console.error(`Transaction ${hash} timed out. Resumbitting ...`)
 				// if the transaction times out, resubmit the transaction by incrementing the attempt
 				// it will use the same nonce and increased gas thereby dropping the previous transaction
 				await this.submitUserOps(userOp, beneficiary, eoa, nonce, attempt + 1)
 			} else {
-				console.error(`Error monitoring transaction ${hash}: ${error}`)
+				console.error(`An unknown error occurred while monitoring transaction ${hash}: ${error}`)
 			}
 		}
 	}
@@ -130,7 +129,7 @@ class UserOpManager {
 	public async submitUserOps(userOps: UserOperation[], beneficiary: Address, eoa: PrivateKeyAccount, nonce: number, attempt: number): Promise<Hex> {
 		if (attempt > this.maxAttempts) {
 			await this.eoaManager.releaseEOA(eoa)
-			throw Error(`Transaction failed after ${this.maxAttempts} attempts`)
+			throw new TransactionFailedError(`Transaction failed after ${this.maxAttempts} attempts`)
 		}
 
 		try {
@@ -144,8 +143,14 @@ class UserOpManager {
 
 			return hash
 		} catch (error) {
-			console.error("Error sending user operation:", error)
-			throw Error("Error sending user operation")
+			await this.eoaManager.releaseEOA(eoa)
+			if (error instanceof ContractError) {
+				console.error(`Failed to submit user operation: ${error}`)
+				throw Error("Failed to submit user operation")
+			} else {
+				console.error(`An unknown error occurred while submitting user operation: ${error}`)
+				throw Error("An unknown error occurred while submitting user operation")
+			}
 		}
 	}
 
@@ -161,8 +166,16 @@ class UserOpManager {
 			const nonce = await this.rpcHelper.getTransactionCount(eoa.address)
 			return await this.submitUserOps(userOps, beneficiary, eoa, nonce, 1)
 		} catch (error) {
-			console.error("Error sending user operation:", error)
-			throw Error("Error sending user operation")
+			if (error instanceof NetworkError) {
+				console.error(`A network error occurred while handling user operation": ${error}`)
+				throw Error("A network error occurred while handling user operation")
+			} else if (error instanceof TimeoutError) {
+				console.error("Timeout: No available EOAs")
+				throw Error("Timeout: No available EOAs")
+			} else {
+				console.error(`error occurred while handling user operation: ${error}`)
+				throw error
+			}
 		}
 	}
 }
