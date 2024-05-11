@@ -21,26 +21,29 @@ describe("UserOpManager", () => {
 			address: "0xfaa3Beedb24884146E199084355b4E9fA33Da086",
 		},
 	}
-	const timeoutMs = 1000
+	const eoaTimeoutMs = 1000
+
+	// To simulate a scenario of stuck txn, set txTimeoutMs to a low value
+	const txTimeoutMs = 100000
 
 	beforeEach(() => {
 		process.env.EOAS = `${eoas[0].privKey},${eoas[1].privKey}`
 		eoaManager = new EOAManager()
 		const entryPoint = new ERC4337EntryPoint("0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789", IENTRY_POINT_ABI)
 		const rpcHelper = new RPCHelper()
-		userOpManager = new UserOpManager(eoaManager, timeoutMs, entryPoint, rpcHelper)
+		userOpManager = new UserOpManager(eoaManager, eoaTimeoutMs,txTimeoutMs, entryPoint, rpcHelper)
 	})
 
 	it("should send a user operation and return a transaction hash", async () => {
 		// with
 		const userOp: UserOperation = {
 			sender: "0x49C82ae7e76fa4CDA761F14e1e9cEA0DD4868724",
-			nonce: hexToBigInt("0x7"),
+			nonce: hexToBigInt("0xb"),
 			initCode: "0x",
 			callData: "0x0000189a0000000000000000000000007a939a944974e759a8365682682be1bd94c8a6d900000000000000000000000000000000000000000000000000005af3107a400000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000",
-			signature: "0x00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000001c5b32f37f5bea87bdd5374eb2ac54ea8e000000000000000000000000000000000000000000000000000000000000004168cdc603726a6dcaf1fd04dfc8cd654e128ce1c88a0a65bb85a2f45ff63d3c0753cd0d018265b29005195a65b698d2e1f84b483548ac4d13986734628b51deba1b00000000000000000000000000000000000000000000000000000000000000",
-			maxFeePerGas: hexToBigInt("0x3ba69c4c"),
-			maxPriorityFeePerGas: hexToBigInt("0x3b9a5028"),
+			signature: "0x00000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000001c5b32f37f5bea87bdd5374eb2ac54ea8e0000000000000000000000000000000000000000000000000000000000000041051eb8dcf3d82e1f72a43e7e66491cc3f03b72e9e2a3f3b717acdb783c78bf626164803ec7b73189f065bf94461861a7856675a7065eb296b8dc4be299571a221c00000000000000000000000000000000000000000000000000000000000000",
+			maxFeePerGas: hexToBigInt("0x23d6fc4b"),
+			maxPriorityFeePerGas: hexToBigInt("0x23c31e77"),
 			verificationGasLimit: hexToBigInt("0xef7c"),
 			callGasLimit: hexToBigInt("0x33f9"),
 			preVerificationGas: hexToBigInt("0xeab6"),
@@ -55,7 +58,7 @@ describe("UserOpManager", () => {
 		expect(transactionHash.length).toBeGreaterThan(0)
 
 		// wait for the transaction to be mined
-		await new Promise((resolve) => setTimeout(resolve, 50000))
+		await new Promise((resolve) => setTimeout(resolve, 100000))
 		const eoaStatus = await eoaManager.getEOAStatus(eoas[0].address as Address)
 		expect(eoaStatus).toBe(false)
 	})

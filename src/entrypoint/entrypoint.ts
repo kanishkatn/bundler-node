@@ -9,6 +9,9 @@ export class ERC4337EntryPoint {
 	public contractAddress: Address
 	public contractABI: object[]
 	private publicClient: PublicClient
+
+	private baseMaxFeePerGas = parseGwei("20")
+	private baseMaxPriorityFeePerGas = parseGwei("2")
   
 	/**
 	 * Creates an instance of ERC4337EntryPoint.
@@ -25,6 +28,24 @@ export class ERC4337EntryPoint {
 			chain: sepolia,
 			transport: http()
 		})
+	}
+
+	/**
+	 * Gets the optimal gas for the transaction based on the gas multiplier.
+	 * @param gas The estimated gas for the transaction.
+	 * @param gasMultiplier The gas multiplier.
+	 * @returns A promise that resolves to the optimal gas, maxFeePerGas, and maxPriorityFeePerGas.
+	 */
+	private async getOptimalGas(gas: bigint, gasMultiplier: number): Promise<[bigint, bigint, bigint]> {
+		// TODO: the multiplier logic here is temporary, mostly for the initial testing flow and should be replaced with a more sophisticated one
+		// for example, ethereum expects a minimum multiplier of 1.10 (10% increase) for the gas limit
+		// Note: it does not work if we just increase the gasLimit on ropsten. 
+		// It is necessary to increase the maxFeePerGas and the maxPriorityFeePerGas as well.
+		const gasLimit = (gas * BigInt(gasMultiplier))/2n // TODO: remove test changes
+		const maxFeePerGas = this.baseMaxFeePerGas * BigInt(gasMultiplier)
+		const maxPriorityFeePerGas = this.baseMaxPriorityFeePerGas * BigInt(gasMultiplier)
+
+		return [gasLimit, maxFeePerGas, maxPriorityFeePerGas]
 	}
   
 	/**
@@ -49,17 +70,23 @@ export class ERC4337EntryPoint {
 			gas: 0n,
 			chain: sepolia, // TODO: remove hardcoded value
 			nonce: nonce,
-			maxFeePerGas: parseGwei("20"),
-			maxPriorityFeePerGas: parseGwei("2"),
+			maxFeePerGas: this.baseMaxFeePerGas,
+			maxPriorityFeePerGas: this.baseMaxPriorityFeePerGas,
 			account: eoa,
 		}
-		const gas = await this.publicClient.estimateContractGas(args)
-		args.gas = gas * BigInt(gasMultiplier)
+		const baseGas = await this.publicClient.estimateContractGas(args)
+		
+		// get the optimal gas for the transaction based on the gas multiplier
+		const [gasLimit, maxFeePerGas, maxPriorityFeePerGas] = await this.getOptimalGas(baseGas, gasMultiplier)
+		args.gas = gasLimit
+		args.maxFeePerGas = maxFeePerGas
+		args.maxPriorityFeePerGas = maxPriorityFeePerGas
 
 		const walletClient = createWalletClient({account: eoa, transport: http(), chain: sepolia})
 		
 		try {
-			// TODO: check if it is nice to have it here
+			// TODO: check if it is nice to have it here. The requirement states that it isn't necessary to simulate the contract
+			// but it will increase the chances of not failing the transaction significantly
 			// const {request} = await this.publicClient.simulateContract(args)
 			// console.log("simulated contract", request)
 			const txHash = await walletClient.writeContract(args)
