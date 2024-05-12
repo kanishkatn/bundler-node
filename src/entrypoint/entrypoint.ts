@@ -1,4 +1,4 @@
-import { Address, http, PrivateKeyAccount, createWalletClient, Hex, createPublicClient, PublicClient, Chain} from "viem"
+import { Address, http, PrivateKeyAccount, createWalletClient, Hex, PublicClient, Chain} from "viem"
 import { UserOperation } from "../types/userop.types"
 import { ContractError } from "../types/errors.types"
 import { getChain } from "../types/chain.types"
@@ -21,14 +21,12 @@ export class ERC4337EntryPoint {
 		contractAddress: Address,
 		contractABI: object[],
 		chain: string,
+		publicClient: PublicClient
 	) {
 		this.contractAddress = contractAddress
 		this.contractABI = contractABI
 		this.chain = getChain(chain)
-		this.publicClient = createPublicClient({
-			chain: this.chain,
-			transport: http()
-		})
+		this.publicClient = publicClient
 	}
 
 	/**

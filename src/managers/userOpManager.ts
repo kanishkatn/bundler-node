@@ -1,11 +1,10 @@
 import EOAManager from "./eoaManager"
-import { PrivateKeyAccount, http, createPublicClient, Hex, PublicClient } from "viem"
+import { PrivateKeyAccount, Hex, PublicClient } from "viem"
 import { UserOperation } from "../types/userop.types"
 import { ERC4337EntryPoint } from "../entrypoint/entrypoint"
 import {TransactionReceipt} from "viem/_types"
 import { RPCHelper } from "../rpcHelper"
 import { TimeoutError, TransactionFailedError } from "../types/errors.types"
-import { getChain } from "../types/chain.types"
 import { TransactionMonitor } from "./txMonitor"
 
 /**
@@ -33,7 +32,6 @@ class UserOpManager {
 	private eoaManager: EOAManager
 	private entryPoint: ERC4337EntryPoint
 	private eoaWaitTime: number
-	private publicClient: PublicClient
 	private rpcHelper: RPCHelper
 	private maxAttempts: number
 	private monitor: TransactionMonitor
@@ -47,7 +45,6 @@ class UserOpManager {
 	 * @param entryPoint The entrypoint instance.
 	 * @param rpcHelper The RPC helper instance.
 	 * @param maxAttempts The maximum number of attempts to send the transaction.
-	 * @param chain The chain name.
 	 * @returns A UserOpManager instance.
 	 */
 	constructor(eoaManager: EOAManager,
@@ -56,18 +53,14 @@ class UserOpManager {
 		entryPoint: ERC4337EntryPoint, 
 		rpcHelper: RPCHelper, 
 		maxAttempts: number = 3,
-		chain: string,
+		publicClient: PublicClient
 	) {
 		this.eoaManager = eoaManager
 		this.eoaWaitTime = eoaWaitTime
 		this.entryPoint = entryPoint
 		this.rpcHelper = rpcHelper
-		this.publicClient = createPublicClient({
-			chain: getChain(chain),
-			transport: http()
-		})
 		this.maxAttempts = maxAttempts
-		this.monitor = new TransactionMonitor(this.publicClient, txWaitTime)
+		this.monitor = new TransactionMonitor(publicClient, txWaitTime)
 
 		// Set up event listeners
 		this.monitor.on("TransactionMined", (hash: Hex, receipt: TransactionReceipt) => this.handleReceipt(hash, receipt))
@@ -154,6 +147,9 @@ class UserOpManager {
 		attempt: number,
 	): Promise<Hex> {
 		if (attempt > this.maxAttempts) {
+			// TODO: if the tx is stuck, do not release the EOA
+			// wait for the tx to be mined and then release the EOA
+			// we maybe need another event listener for this?
 			await this.eoaManager.releaseEOA(eoa)
 			throw new TransactionFailedError(`Transaction failed after ${this.maxAttempts} attempts`)
 		}

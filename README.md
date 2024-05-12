@@ -189,6 +189,11 @@ curl -X POST localhost:3000/jsonrpc \
 
 If you'd like to use a test suite, please refer to `index.test.ts`. Replace the test there accordingly and remove `.skip()`.
 
-## Further improvements
+# Further improvements
 
 - Integration tests for `userOpManager.ts` and the bundler node.
+- If the node exceeds the max retries and a tx is stuck, we may not want to release the EOA. An ideal approach would be to mark the EOA as unusable until the stuck tx is cleared.
+- When a tx is retried or replaced, maintain the record of new tx hash for the given UserOp's original tx hash
+- Add request rate limiting to express rpc server
+- Create interfaces to the managers
+- Structured logging

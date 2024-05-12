@@ -5,17 +5,22 @@ import { IENTRY_POINT_ABI } from "./entrypoint/entrypoint.abi"
 import { RPCHelper } from "./rpcHelper"
 import EOAManager from "./managers/eoaManager"
 import config from "../config.json"
-import { Address, TimeoutError } from "viem"
+import { Address, TimeoutError, createPublicClient, http } from "viem"
 import UserOpManager from "./managers/userOpManager"
 import { ContractError, InvalidUserOperationError, NetworkError } from "./types/errors.types"
 import { parseUserOperation } from "./types/userop.types"
+import { getChain } from "./types/chain.types"
 
 const app = express()
 app.use(bodyParser.json())
 
 // Initialise the modules
-const entrypoint = new ERC4337EntryPoint(config.entrypointContract as Address, IENTRY_POINT_ABI, config.chain)
-const rpcHelper = new RPCHelper(config.chain)
+const publicClient = createPublicClient({
+	chain: getChain(config.chain),
+	transport: http()
+})
+const entrypoint = new ERC4337EntryPoint(config.entrypointContract as Address, IENTRY_POINT_ABI, config.chain, publicClient)
+const rpcHelper = new RPCHelper(publicClient)
 const eoaManager = new EOAManager(config.eoas)
 const userOpManager = new UserOpManager(eoaManager, 
 	config.eoaWaitTimeMS, 
@@ -23,7 +28,7 @@ const userOpManager = new UserOpManager(eoaManager,
 	entrypoint, 
 	rpcHelper, 
 	config.maxAttempts, 
-	config.chain,
+	publicClient,
 )
 
 app.locals.userOpManager = userOpManager
@@ -40,13 +45,16 @@ app.post("/jsonrpc", async (req, res) => {
 			if (!params || params.length < 1) {
 				throw new InvalidUserOperationError("Invalid params")
 			}
+
+			// Take the first userOp
+			// This isn't tested for multiple userOps
 			const data = params[0]
 			if (!data) {
 				throw new InvalidUserOperationError("empty user operation")
 			}
 
 			const userOp = parseUserOperation(data)
-			console.debug("userOp", userOp)
+			console.debug("userOp: ", userOp)
 
 			const txHash = await userOpManager.handleUserOp([userOp])
 			return res.status(200).json({ jsonrpc: "2.0", txHash, id })

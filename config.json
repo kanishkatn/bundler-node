@@ -5,7 +5,7 @@
     },
     "chain": "sepolia",
     "entrypointContract":"0x5ff137d4b0fdcd49dca30c7cf57e578a026d2789",
-    "eoas": "",
+    "eoas": "0x,0x",
     "eoaWaitTimeMS": 5000,
     "txWaitTimeMS": 120000,
     "maxAttempts": 3

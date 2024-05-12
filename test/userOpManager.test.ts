@@ -3,8 +3,9 @@ import EOAManager from "../src/managers/eoaManager"
 import { UserOperation } from "../src/types/userop.types"
 import { ERC4337EntryPoint } from "../src/entrypoint/entrypoint"
 import { IENTRY_POINT_ABI } from "../src/entrypoint/entrypoint.abi"
-import { Address, hexToBigInt } from "viem"
+import { Address, createPublicClient, hexToBigInt, http } from "viem"
 import { RPCHelper } from "../src/rpcHelper"
+import { getChain } from "../src/types/chain.types"
 
 describe("UserOpManager", () => {
 	jest.retryTimes(0)
@@ -22,7 +23,6 @@ describe("UserOpManager", () => {
 		},
 	}
 	const eoaTimeoutMs = 1000
-
 	// To simulate a scenario of stuck txn, set txTimeoutMs to a low value
 	const txTimeoutMs = 100000
 	const entrypointContract = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"
@@ -31,10 +31,14 @@ describe("UserOpManager", () => {
 
 	beforeEach(() => {
 		const eoaString = `${eoas[0].privKey},${eoas[1].privKey}`
+		const publicClient = createPublicClient({
+			chain: getChain(chain),
+			transport: http()
+		})
 		eoaManager = new EOAManager(eoaString)
-		const entryPoint = new ERC4337EntryPoint(entrypointContract, IENTRY_POINT_ABI, chain)
-		const rpcHelper = new RPCHelper(chain)
-		userOpManager = new UserOpManager(eoaManager, eoaTimeoutMs,txTimeoutMs, entryPoint, rpcHelper, maxAttempts, chain)
+		const entryPoint = new ERC4337EntryPoint(entrypointContract, IENTRY_POINT_ABI, chain, publicClient)
+		const rpcHelper = new RPCHelper(publicClient)
+		userOpManager = new UserOpManager(eoaManager, eoaTimeoutMs,txTimeoutMs, entryPoint, rpcHelper, maxAttempts, publicClient)
 	})
 
 	// This is a boilerplate test for the UserOpManager class

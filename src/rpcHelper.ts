@@ -1,17 +1,21 @@
-import { createPublicClient, PublicClient, http, Hex, TransactionReceipt, Address } from "viem"
+import { PublicClient, Hex, TransactionReceipt, Address } from "viem"
 import { NetworkError } from "./types/errors.types"
-import { getChain } from "./types/chain.types"
 
+/**
+ * RPCHelper provides helper functions for interacting with the RPC.
+ */
 export class RPCHelper {
 	private PublicClient: PublicClient
 
-	constructor(chain: string) {
-		this.PublicClient = createPublicClient({
-			chain: getChain(chain),
-			transport: http()
-		})
+	constructor(publicClient: PublicClient) {
+		this.PublicClient = publicClient
 	}
 
+	/**
+	 * Gets the transaction count for an address.
+	 * @param address The address.
+	 * @returns A promise that resolves to the transaction count.
+	 */
 	public async getTransactionCount(address: Address): Promise<number> {
 		try {
 			const count = await this.PublicClient.getTransactionCount({address: address})
@@ -25,6 +29,11 @@ export class RPCHelper {
 		}
 	}
 
+	/**
+	 * Gets the transaction receipt for a transaction hash.
+	 * @param hash The transaction hash.
+	 * @returns A promise that resolves to the transaction receipt.
+	 */
 	public async getTransactionReceipt(hash: Hex): Promise<TransactionReceipt> {
 		try {
 			const receipt = await this.PublicClient.getTransactionReceipt({hash: hash})
