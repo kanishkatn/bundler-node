@@ -27,7 +27,7 @@ const userOpManager = new UserOpManager(eoaManager,
 )
 
 app.locals.userOpManager = userOpManager
-app.locals.beneficiary = config.beneficiary
+app.locals.eoaManager = eoaManager
 
 app.post("/jsonrpc", async (req, res) => {
 	const { jsonrpc, method, params, id } = req.body
@@ -48,7 +48,7 @@ app.post("/jsonrpc", async (req, res) => {
 			const userOp = parseUserOperation(data)
 			console.debug("userOp", userOp)
 
-			const txHash = await userOpManager.handleUserOp([userOp], app.locals.beneficiary)
+			const txHash = await userOpManager.handleUserOp([userOp])
 			return res.status(200).json({ jsonrpc: "2.0", txHash, id })
 		}
     

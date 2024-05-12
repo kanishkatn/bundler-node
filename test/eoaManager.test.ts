@@ -64,9 +64,9 @@ describe("EOAManager Tests", () => {
 	test("should update eoa status correctly", async () => {
 		const availableEOA = await eoaManager.acquireEOA(timeoutMs)
 		expect(availableEOA).toBeDefined()
-		expect(await eoaManager.getEOAStatus(availableEOA.address)).toBe(true)
+		expect(eoaManager.getEOAStatus(availableEOA.address)).toBe(true)
 		await eoaManager.releaseEOA(availableEOA)
-		expect(await eoaManager.getEOAStatus(availableEOA.address)).toBe(false)
+		expect(eoaManager.getEOAStatus(availableEOA.address)).toBe(false)
 	})
 
 	test("should timeout if no EOAs are available", async () => {

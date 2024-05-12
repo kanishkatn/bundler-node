@@ -93,6 +93,7 @@ class EOAManager {
 	 */
 	public async releaseEOA(eoa: PrivateKeyAccount): Promise<void> {
 		await this.eoaMutex.acquire().then((release) => {
+			console.debug(`Releasing EOA ${eoa.address} ...`)
 			this.eoaStatus[eoa.address] = false
 			release()
 			this.eoaEmitter.emit("eoa-available", eoa)
@@ -104,8 +105,24 @@ class EOAManager {
 	 * @param eoa The EOA address.
 	 * @returns The status of the EOA.
 	 */
-	public async getEOAStatus( eoa: Address): Promise<boolean> {
+	public getEOAStatus( eoa: Address): boolean {
 		return this.eoaStatus[eoa]
+	}
+
+	/**
+	 * Gets the number of available EOAs.
+	 * @returns The number of available EOAs.
+	 */
+	public availableEOAs(): number {
+		return Object.values(this.eoaStatus).filter((status) => !status).length
+	}
+
+	/**
+	 * Gets the total number of EOAs.
+	 * @returns The total number of EOAs.
+	 */
+	public totalEOAs(): number {
+		return Object.values(this.eoaStatus).length
 	}
 }
 

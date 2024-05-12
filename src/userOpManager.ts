@@ -1,5 +1,5 @@
 import EOAManager from "./eoaManager"
-import { PrivateKeyAccount, http, createPublicClient, Hex, PublicClient, Address } from "viem"
+import { PrivateKeyAccount, http, createPublicClient, Hex, PublicClient } from "viem"
 import { UserOperation } from "./types/userop.types"
 import { ERC4337EntryPoint } from "./entrypoint/entrypoint"
 import {TransactionReceipt} from "viem/_types"
@@ -7,11 +7,19 @@ import { RPCHelper } from "./rpcHelper"
 import { TimeoutError, TransactionFailedError } from "./types/errors.types"
 import { getChain } from "./types/chain.types"
 
+enum TxStatus {
+	Pending = "pending",
+}
+
 /**
  * UserOpManager manages the sending of user operations.
  * It acquires an EOA from the EOAManager, sends the user operation, and releases the EOA.
  * It also monitors the transaction status and retries if necessary.
  */
+// TODO: Instead of holding the eoas when a tx fails or stuck, we should maybe look into releasing the eoas and reacquiring them during the retry
+// Holding them will give priority to earlier userOps but will cause the later userOps to be delayed or even dropped
+// We'll need to have a local state in order to achieve this. It is out of scope for this task
+// The local state can keep track of the userOps that are pending and retry them in a separate thread
 class UserOpManager {
 	private eoaManager: EOAManager
 	private entryPoint: ERC4337EntryPoint
@@ -20,6 +28,7 @@ class UserOpManager {
 	private publicClient: PublicClient
 	private rpcHelper: RPCHelper
 	private maxAttempts: number
+	private pendingTransactions: Map<Hex, TxStatus> = new Map()
 
 	/**
 	 * Creates an instance of UserOpManager.
@@ -61,6 +70,14 @@ class UserOpManager {
 	}
 
 	/**
+	 * Gets the number of pending transactions.
+	 * @returns The number of pending transactions.
+	 */
+	public getPendingTransactionCount(): number {
+		return this.pendingTransactions.size
+	}
+
+	/**
 	 * Monitors the transaction status.
 	 * @param hash The transaction hash.
 	 * @returns A promise that resolves to the transaction receipt.
@@ -99,7 +116,6 @@ class UserOpManager {
 	 * @returns A promise that resolves when the monitoring is complete.
 	 */
 	private async monitorAndReleaseEOA(userOp: UserOperation[], 
-		beneficiary: Address, 
 		hash: Hex, eoa: PrivateKeyAccount, 
 		nonce: number, 
 		attempt: number,
@@ -108,23 +124,25 @@ class UserOpManager {
 			const receipt = await this.monitorTransaction(hash)
 			if (receipt.status == "success") {
 				console.log(`Transaction ${hash} succeeded`)
-				console.debug(`Releasing EOA ${eoa.address} ...`)
 				await this.eoaManager.releaseEOA(eoa)
 			} else {
 				console.log(`Transaction ${hash} failed. Resubmitting ...`)
 				// if the transaction fails, resubmit the transaction by incrementing the nonce and attempt after a delay
 				await this.delay(20000)
-				await this.submitUserOps(userOp, beneficiary, eoa, nonce + 1, attempt + 1)
+				await this.submitUserOps(userOp, eoa, nonce + 1, attempt + 1)
 			}
 		} catch (error: unknown) {
 			if (error instanceof TimeoutError) {
 				console.error(`Transaction ${hash} timed out. Resumbitting ...`)
 				// if the transaction times out, resubmit the transaction by incrementing the attempt 
 				// it will use the same nonce and increased gas thereby dropping the previous transaction
-				await this.submitUserOps(userOp, beneficiary, eoa, nonce, attempt + 1)
+				await this.submitUserOps(userOp, eoa, nonce, attempt + 1)
 			} else {
 				console.error(`An unknown error occurred while monitoring transaction ${hash}: ${error}`)
+				await this.eoaManager.releaseEOA(eoa)
 			}
+		} finally {
+			this.pendingTransactions.delete(hash)
 		}
 	}
 
@@ -132,15 +150,13 @@ class UserOpManager {
 	 * Submits the user operations to the entrypoint.
 	 * Starts the monitoring and releasing of the EOA after the transaction is sent.
 	 * @param userOps The user operations.
-	 * @param beneficiary The address of the beneficiary.
 	 * @param eoa The EOA.
 	 * @param nonce The nonce of the EOA.
 	 * @param attempt The attempt number.
 	 * @returns A promise that resolves to the transaction hash.
 	 * @throws Error if the transaction fails after 3 attempts.
 	 */
-	public async submitUserOps(userOps: UserOperation[], 
-		beneficiary: Address, 
+	public async submitUserOps(userOps: UserOperation[],
 		eoa: PrivateKeyAccount, 
 		nonce: number, 
 		attempt: number,
@@ -153,10 +169,11 @@ class UserOpManager {
 		try {
 			// we pass the attempt number as the gas multiplier
 			// eg: if the attempt is 2, the gas will be multiplied by 2 for the better chance of success
-			const hash = await this.entryPoint.handleOps(userOps, beneficiary, eoa, nonce, attempt)
+			const hash = await this.entryPoint.handleOps(userOps, eoa, nonce, attempt)
+			this.pendingTransactions.set(hash, TxStatus.Pending)
 
 			process.nextTick(() => {
-				this.monitorAndReleaseEOA(userOps, beneficiary, hash, eoa, nonce, attempt)
+				this.monitorAndReleaseEOA(userOps, hash, eoa, nonce, attempt)
 			})
 
 			return hash
@@ -169,14 +186,13 @@ class UserOpManager {
 	/**
 	 * Handles a user operation.
 	 * @param userOp The user operation.
-	 * @param beneficiary The address of the beneficiary.
 	 * @returns A promise that resolves to the transaction hash.
 	 */
-	public async handleUserOp(userOps: UserOperation[], beneficiary: Address): Promise<Hex> {
+	public async handleUserOp(userOps: UserOperation[]): Promise<Hex> {
 		try {
 			const eoa = await this.eoaManager.acquireEOA(this.eoaWaitTime)
 			const nonce = await this.rpcHelper.getTransactionCount(eoa.address)
-			return await this.submitUserOps(userOps, beneficiary, eoa, nonce, 1)
+			return await this.submitUserOps(userOps, eoa, nonce, 1)
 		} catch (error) {
 			if (error instanceof TimeoutError) {
 				throw Error(`Timeout Error: ${error.message}`)

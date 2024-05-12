@@ -1,4 +1,4 @@
-import { Address, http, parseGwei, PrivateKeyAccount, createWalletClient, Hex, createPublicClient, PublicClient, Chain} from "viem"
+import { Address, http, PrivateKeyAccount, createWalletClient, Hex, createPublicClient, PublicClient, Chain} from "viem"
 import { UserOperation } from "../types/userop.types"
 import { ContractError } from "../types/errors.types"
 import { getChain } from "../types/chain.types"
@@ -11,9 +11,6 @@ export class ERC4337EntryPoint {
 	public contractABI: object[]
 	private publicClient: PublicClient
 	private chain: Chain
-
-	private baseMaxFeePerGas = parseGwei("20")
-	private baseMaxPriorityFeePerGas = parseGwei("2")
   
 	/**
 	 * Creates an instance of ERC4337EntryPoint.
@@ -38,58 +35,49 @@ export class ERC4337EntryPoint {
 	 * Gets the optimal gas for the transaction based on the gas multiplier.
 	 * @param gas The estimated gas for the transaction.
 	 * @param gasMultiplier The gas multiplier.
-	 * @returns A promise that resolves to the optimal gas, maxFeePerGas, and maxPriorityFeePerGas.
+	 * @returns A promise that resolves to the optimal gas.
 	 */
-	private async getOptimalGas(gas: bigint, gasMultiplier: number): Promise<[bigint, bigint, bigint]> {
+	private async getOptimalGas(gas: bigint, gasMultiplier: number): Promise<bigint> {
 		// TODO: the multiplier logic here is temporary, mostly for the initial testing flow and should be replaced with a more sophisticated one
 		// for example, ethereum expects a minimum multiplier of 1.10 (10% increase) for the gas limit
-		// Note: it does not work if we just increase the gasLimit on sepolia. 
-		// It is necessary to increase the maxFeePerGas and the maxPriorityFeePerGas as well.
 		if (gasMultiplier < 1) {
 			throw new Error("Gas multiplier must be greater than or equal to 1")
 		}
-		const gasLimit = gas * BigInt(gasMultiplier)
-		const maxFeePerGas = this.baseMaxFeePerGas * BigInt(gasMultiplier)
-		const maxPriorityFeePerGas = this.baseMaxPriorityFeePerGas * BigInt(gasMultiplier)
-
-		return [gasLimit, maxFeePerGas, maxPriorityFeePerGas]
+		return gas * BigInt(gasMultiplier)
 	}
   
 	/**
 	 * Submits a user operation to the ERC4337 contract.
 	 * @param userOp The user operation to be submitted.
-	 * @param beneficiary The address of the beneficiary.
 	 * @param eoa The EOA (Externally Owned Account) used to sign the transaction.
 	 * @returns A promise that resolves to the transaction hash.
 	 */
 	async handleOps(
 		userOp: UserOperation[],
-		beneficiary: Address,
 		eoa: PrivateKeyAccount,
 		nonce: number,
 		gasMultiplier: number = 1
 	): Promise<Hex> {
-		const args = {
-			address: this.contractAddress as Address,
-			abi: this.contractABI,
-			functionName: "handleOps",
-			args: [userOp, beneficiary],
-			gas: 0n,
-			chain: this.chain, 
-			nonce: nonce,
-			maxFeePerGas: this.baseMaxFeePerGas,
-			maxPriorityFeePerGas: this.baseMaxPriorityFeePerGas,
-			account: eoa,
-		}
-		
 		try {
+			const { maxFeePerGas, maxPriorityFeePerGas } = await this.publicClient.estimateFeesPerGas()
+			const args = {
+				address: this.contractAddress as Address,
+				abi: this.contractABI,
+				functionName: "handleOps",
+				args: [userOp, eoa.address],
+				gas: 0n,
+				chain: this.chain, 
+				nonce: nonce,
+				maxFeePerGas: maxFeePerGas,
+				maxPriorityFeePerGas: maxPriorityFeePerGas,
+				account: eoa,
+			}
 			const baseGas = await this.publicClient.estimateContractGas(args)
 			
 			// get the optimal gas for the transaction based on the gas multiplier
-			const [gasLimit, maxFeePerGas, maxPriorityFeePerGas] = await this.getOptimalGas(baseGas, gasMultiplier)
+			const gasLimit = await this.getOptimalGas(baseGas, gasMultiplier)
 			args.gas = gasLimit
-			args.maxFeePerGas = maxFeePerGas
-			args.maxPriorityFeePerGas = maxPriorityFeePerGas
+			console.debug("args", args)
 	
 			const walletClient = createWalletClient({account: eoa, transport: http(), chain: this.chain})
 			// TODO: check if it is nice to have it here. The requirement states that it isn't necessary to simulate the contract.
