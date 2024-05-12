@@ -6,9 +6,22 @@ import {TransactionReceipt} from "viem/_types"
 import { RPCHelper } from "../rpcHelper"
 import { TimeoutError, TransactionFailedError } from "../types/errors.types"
 import { getChain } from "../types/chain.types"
+import { TransactionMonitor } from "./txMonitor"
 
-enum TxStatus {
-	Pending = "pending",
+/**
+ * Represents a transaction.
+ * @property hash The transaction hash.
+ * @property userOp The user operations.
+ * @property eoa The EOA (Externally Owned Account) used to sign the transaction.
+ * @property nonce The nonce of the EOA.
+ * @property attempt The attempt number.
+ */
+interface Transaction {
+	hash: Hex
+	userOp: UserOperation[]
+	eoa: PrivateKeyAccount
+	nonce: number
+	attempt: number
 }
 
 /**
@@ -16,19 +29,15 @@ enum TxStatus {
  * It acquires an EOA from the EOAManager, sends the user operation, and releases the EOA.
  * It also monitors the transaction status and retries if necessary.
  */
-// TODO: Instead of holding the eoas when a tx fails or stuck, we should maybe look into releasing the eoas and reacquiring them during the retry
-// Holding them will give priority to earlier userOps but will cause the later userOps to be delayed or even dropped
-// We'll need to have a local state in order to achieve this. It is out of scope for this task
-// The local state can keep track of the userOps that are pending and retry them in a separate thread
 class UserOpManager {
 	private eoaManager: EOAManager
 	private entryPoint: ERC4337EntryPoint
 	private eoaWaitTime: number
-	private txWaitTime: number
 	private publicClient: PublicClient
 	private rpcHelper: RPCHelper
 	private maxAttempts: number
-	private pendingTransactions: Map<Hex, TxStatus> = new Map()
+	private monitor: TransactionMonitor
+	private pendingTransactions = new Map<Hex, Transaction>()
 
 	/**
 	 * Creates an instance of UserOpManager.
@@ -38,6 +47,7 @@ class UserOpManager {
 	 * @param entryPoint The entrypoint instance.
 	 * @param rpcHelper The RPC helper instance.
 	 * @param maxAttempts The maximum number of attempts to send the transaction.
+	 * @param chain The chain name.
 	 * @returns A UserOpManager instance.
 	 */
 	constructor(eoaManager: EOAManager,
@@ -50,7 +60,6 @@ class UserOpManager {
 	) {
 		this.eoaManager = eoaManager
 		this.eoaWaitTime = eoaWaitTime
-		this.txWaitTime = txWaitTime
 		this.entryPoint = entryPoint
 		this.rpcHelper = rpcHelper
 		this.publicClient = createPublicClient({
@@ -58,6 +67,12 @@ class UserOpManager {
 			transport: http()
 		})
 		this.maxAttempts = maxAttempts
+		this.monitor = new TransactionMonitor(this.publicClient, txWaitTime)
+
+		// Set up event listeners
+		this.monitor.on("TransactionMined", (hash: Hex, receipt: TransactionReceipt) => this.handleReceipt(hash, receipt))
+		this.monitor.on("MonitoringError", (hash: Hex, error: Error) => this.handleMonitoringError(hash, error))
+		this.monitor.on("TransactionTimedout", (hash: Hex) => this.handleTransactionTimeout(hash))
 	}
 
 	/**
@@ -78,72 +93,49 @@ class UserOpManager {
 	}
 
 	/**
-	 * Monitors the transaction status.
+	 * Handles the receipt of the transaction. 
+	 * If the transaction is successful, it releases the EOA.
+	 * If the transaction fails, it retries the transaction.
 	 * @param hash The transaction hash.
-	 * @returns A promise that resolves to the transaction receipt.
-	 * @throws Error if the transaction receipt is not found within the timeout.
+	 * @param receipt The transaction receipt.
 	 */
-	private async monitorTransaction(hash: string): Promise<TransactionReceipt> {
-		const startTime = Date.now()
-
-		while(Date.now() - startTime < this.txWaitTime) {  // Continues until a receipt is found or timeout is reached
-			try {
-				const receipt: TransactionReceipt | null = await this.publicClient.getTransactionReceipt({ hash: hash as Hex })
-				console.log("Transaction receipt:", receipt)
-				if (receipt) {
-					console.log("Transaction status:", receipt.status)
-					return receipt
-				}
-	
-				await this.delay(10000)
-			} catch (error) {
-				console.debug(`Failed to get transaction receipt for hash ${hash}: ${error}`)
-			} finally {
-				await this.delay(1000)
-			}
+	private async handleReceipt(hash: Hex, receipt: TransactionReceipt) {
+		if (receipt.status == "success") {
+			console.debug(`Transaction ${hash} succeeded`)
+			const { eoa } = this.pendingTransactions.get(hash) as Transaction
+			await this.eoaManager.releaseEOA(eoa)
+		} else {
+			console.debug(`Transaction ${hash} failed. Retrying ...`)
+			await this.delay(30000)
+			const { userOp, eoa, nonce, attempt } = this.pendingTransactions.get(hash) as Transaction
+			await this.submitUserOps(userOp, eoa, nonce + 1, attempt + 1)
 		}
-
-		throw new TimeoutError("Transaction timed out")
+		this.pendingTransactions.delete(hash)
 	}
 
 	/**
-	 * Monitors the transaction status and releases the EOA.
-	 * @param userOp The user operation.
+	 * Handles the unexpected monitoring error.
 	 * @param hash The transaction hash.
-	 * @param eoa The EOA.
-	 * @param nonce The nonce of the EOA.
-	 * @param attempt The attempt number.
-	 * @returns A promise that resolves when the monitoring is complete.
+	 * @param error The error.
+	 * 
+	 * TODO: What kind of error could occur here? We should handle it accordingly
 	 */
-	private async monitorAndReleaseEOA(userOp: UserOperation[], 
-		hash: Hex, eoa: PrivateKeyAccount, 
-		nonce: number, 
-		attempt: number,
-	): Promise<void> {
-		try {
-			const receipt = await this.monitorTransaction(hash)
-			if (receipt.status == "success") {
-				console.log(`Transaction ${hash} succeeded`)
-				await this.eoaManager.releaseEOA(eoa)
-			} else {
-				console.log(`Transaction ${hash} failed. Resubmitting ...`)
-				// if the transaction fails, resubmit the transaction by incrementing the nonce and attempt after a delay
-				await this.delay(20000)
-				await this.submitUserOps(userOp, eoa, nonce + 1, attempt + 1)
-			}
-		} catch (error: unknown) {
-			if (error instanceof TimeoutError) {
-				console.error(`Transaction ${hash} timed out. Resumbitting ...`)
-				// if the transaction times out, resubmit the transaction by incrementing the attempt 
-				// it will use the same nonce and increased gas thereby dropping the previous transaction
-				await this.submitUserOps(userOp, eoa, nonce, attempt + 1)
-			} else {
-				console.error(`An unknown error occurred while monitoring transaction ${hash}: ${error}`)
-				await this.eoaManager.releaseEOA(eoa)
-			}
-		} finally {
-			this.pendingTransactions.delete(hash)
-		}
+	private async handleMonitoringError(hash: Hex, error: Error) {
+		console.debug(`An error occurred while monitoring transaction ${hash}: ${error}`)
+		this.delay(10000)
+		this.monitor.monitorTransaction(hash)
+	}
+
+	/**
+	 * Handles the transaction timeout.
+	 * If the transaction times out, it retries the transaction with the same nonce.
+	 * @param hash The transaction hash.
+	 */
+	private async handleTransactionTimeout(hash: Hex) {
+		console.debug(`Transaction ${hash} timed out`)
+		const { userOp, eoa, nonce, attempt } = this.pendingTransactions.get(hash) as Transaction
+		this.pendingTransactions.delete(hash)
+		await this.submitUserOps(userOp, eoa, nonce, attempt + 1)
 	}
 
 	/**
@@ -154,9 +146,9 @@ class UserOpManager {
 	 * @param nonce The nonce of the EOA.
 	 * @param attempt The attempt number.
 	 * @returns A promise that resolves to the transaction hash.
-	 * @throws Error if the transaction fails after 3 attempts.
+	 * @throws Error if the transaction has been attempted more than the maximum number of attempts.
 	 */
-	public async submitUserOps(userOps: UserOperation[],
+	private async submitUserOps(userOps: UserOperation[],
 		eoa: PrivateKeyAccount, 
 		nonce: number, 
 		attempt: number,
@@ -170,10 +162,10 @@ class UserOpManager {
 			// we pass the attempt number as the gas multiplier
 			// eg: if the attempt is 2, the gas will be multiplied by 2 for the better chance of success
 			const hash = await this.entryPoint.handleOps(userOps, eoa, nonce, attempt)
-			this.pendingTransactions.set(hash, TxStatus.Pending)
+			this.pendingTransactions.set(hash, { hash, userOp: userOps, eoa, nonce, attempt })
 
 			process.nextTick(() => {
-				this.monitorAndReleaseEOA(userOps, hash, eoa, nonce, attempt)
+				this.monitor.monitorTransaction(hash)
 			})
 
 			return hash

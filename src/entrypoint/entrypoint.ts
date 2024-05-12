@@ -40,6 +40,7 @@ export class ERC4337EntryPoint {
 	private async getOptimalGas(gas: bigint, gasMultiplier: number): Promise<bigint> {
 		// TODO: the multiplier logic here is temporary, mostly for the initial testing flow and should be replaced with a more sophisticated one
 		// for example, ethereum expects a minimum multiplier of 1.10 (10% increase) for the gas limit
+		// Maybe this could also increase maxFeePerGas and maxPriorityFeePerGas
 		if (gasMultiplier < 1) {
 			throw new Error("Gas multiplier must be greater than or equal to 1")
 		}
@@ -77,7 +78,6 @@ export class ERC4337EntryPoint {
 			// get the optimal gas for the transaction based on the gas multiplier
 			const gasLimit = await this.getOptimalGas(baseGas, gasMultiplier)
 			args.gas = gasLimit
-			console.debug("args", args)
 	
 			const walletClient = createWalletClient({account: eoa, transport: http(), chain: this.chain})
 			// TODO: check if it is nice to have it here. The requirement states that it isn't necessary to simulate the contract.

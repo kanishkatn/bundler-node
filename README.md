@@ -11,6 +11,7 @@ src
 ├── managers
 │   ├── eoaManager.ts
 │   └── userOpManager.ts
+│   └── txMonitor.ts
 ├── types
 │   ├── chain.types.ts
 │   ├── errors.types.ts
@@ -40,6 +41,9 @@ This module manages the Externally Owned Accounts (EOAs) used for sending actual
 
 `userOpManager.ts`
 This module manages the UserOperation submissions and retries. It is responsible for handling the execution of UserOperations and their lifecycle.
+
+`txMonitor.ts`
+This module monitors a txHash and emits the events accordingly.
 
 `src/types/`
 
@@ -183,9 +187,8 @@ curl -X POST localhost:3000/jsonrpc \
 }'
 ```
 
+If you'd like to use a test suite, please refer to `index.test.ts`. Replace the test there accordingly and remove `.skip()`.
+
 ## Further improvements
 
 - Integration tests for `userOpManager.ts` and the bundler node.
-- In `UserOpManager`, instead of holding the eoas when a tx fails or stuck, it might be beneficial to try a different approach. Maybe release the eoas and reacqure them during the retry. 
-- The above enhancement needs to maintain a local state.
-- Abstract the monitoring operations away from `UserOpManager`.

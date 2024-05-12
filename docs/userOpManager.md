@@ -1,12 +1,12 @@
 # UserOpManager
 
-`UserOpManager` is a class designed for managing and processing user operations from Externally Owned Accounts (EOAs). It coordinates the acquisition of EOAs from the `EOAManager`, submits user operations, monitors transaction statuses, and handles retries in case of failures or delays.
+The `UserOpManager` is a class that manages the sending of user operations to the ERC-4337 EntryPoint contract. It acquires an EOA (Externally Owned Account) from the `EOAManager`, sends the user operation, and releases the EOA. It also monitors the transaction status and retries if necessary.
 
 ## Features
 
 - **Acquire and Release EOAs**: Manages EOAs efficiently to ensure no conflicts or resource starvation.
-- **Transaction Monitoring**: Monitors the status of blockchain transactions and handles retries if the transaction fails or times out.
-- **Error Handling**: Implements robust error handling for timeouts and transaction failures, improving reliability.
+- **Transaction Monitoring**: Monitors the transaction status and retries if necessary
+- **Error Handling**: Handles transaction failures and timeouts
 - **Concurrency Management**: Handles operations asynchronously to improve throughput and reduce latency.
 
 ## Basic Usage
