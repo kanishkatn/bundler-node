@@ -1,5 +1,5 @@
-import UserOpManager from "../src/userOpManager"
-import EOAManager from "../src/eoaManager"
+import UserOpManager from "../src/managers/userOpManager"
+import EOAManager from "../src/managers/eoaManager"
 import { UserOperation } from "../src/types/userop.types"
 import { ERC4337EntryPoint } from "../src/entrypoint/entrypoint"
 import { IENTRY_POINT_ABI } from "../src/entrypoint/entrypoint.abi"

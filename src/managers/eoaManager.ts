@@ -2,7 +2,7 @@ import { Address, Hex } from "viem"
 import { privateKeyToAccount, PrivateKeyAccount } from "viem/accounts"
 import { EventEmitter } from "events"
 import { Mutex } from "async-mutex"
-import { TimeoutError } from "./types/errors.types"
+import { TimeoutError } from "../types/errors.types"
 
 /**
  * EOAStatus is a map of EOA addresses to their availability status.

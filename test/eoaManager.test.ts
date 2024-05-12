@@ -1,4 +1,4 @@
-import EOAManager from "../src/eoaManager"
+import EOAManager from "../src/managers/eoaManager"
 
 describe("EOAManager Tests", () => {
 	let eoaManager: EOAManager

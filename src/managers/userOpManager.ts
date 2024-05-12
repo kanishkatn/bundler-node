@@ -1,11 +1,11 @@
 import EOAManager from "./eoaManager"
 import { PrivateKeyAccount, http, createPublicClient, Hex, PublicClient } from "viem"
-import { UserOperation } from "./types/userop.types"
-import { ERC4337EntryPoint } from "./entrypoint/entrypoint"
+import { UserOperation } from "../types/userop.types"
+import { ERC4337EntryPoint } from "../entrypoint/entrypoint"
 import {TransactionReceipt} from "viem/_types"
-import { RPCHelper } from "./rpcHelper"
-import { TimeoutError, TransactionFailedError } from "./types/errors.types"
-import { getChain } from "./types/chain.types"
+import { RPCHelper } from "../rpcHelper"
+import { TimeoutError, TransactionFailedError } from "../types/errors.types"
+import { getChain } from "../types/chain.types"
 
 enum TxStatus {
 	Pending = "pending",
